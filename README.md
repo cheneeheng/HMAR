@@ -6,3 +6,6 @@
  - kinect tracking of object based on color segmentation.
  - location prediction based on fixed scene points and direction vectors.
  - contact detection based on depth.
+
+testing
+
