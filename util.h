@@ -209,7 +209,9 @@ Function Headers
 
 cv::Vec3f movingAveragePoint(std::vector<cv::Vec3f>points,float window);
 
-float movingAverageSpeed(std::vector<float> speeds,float window);
+float movingAverageFloat(std::vector<float> data,float window);
+
+double movingAverageDouble(std::vector<double> data,float window);
 
 cv::Vec3f pointToVelocity(cv::Vec3f p1, cv::Vec3f p2);
 
@@ -222,7 +224,7 @@ int markerContact(std::vector<cv::Vec3f> marker_center, cv::Vec4f plane, cv::Vec
 
 void depthImaging(cv::Mat &depth_image, cv::Mat depth_global, uint16_t* mGamma);
 
-cv::Vec3f pointCloudTrajectory(cv::Mat cloud);
+void pointCloudTrajectory(cv::Mat cloud, cv::Vec3f &point, std::vector<double> &EV);
 
 void normalPlaneCheck(cv::Vec4f &plane_equation);
 

@@ -578,7 +578,10 @@ void noiseRemoveBox(cv::Mat seg_mask, cv::Mat& seg_mask_noisefree, cv::Rect& box
 //====================================================================================================================================
 
 
-cv::Vec3f pointCloudTrajectory(cv::Mat cloud){
+void pointCloudTrajectory(cv::Mat cloud, cv::Vec3f &point, std::vector<double> &EV){
+
+  cv::Mat data_pts = cv::Mat(cloud.size().width*cloud.size().height, 3, CV_64FC1);
+
   cv::Vec3f single_point,tmp_point;
   cv::Vec3f pc_traj;
   float tmp = 5.0;
@@ -594,6 +597,9 @@ cv::Vec3f pointCloudTrajectory(cv::Mat cloud){
     single_point = cloud.at<cv::Vec3f>(i,ii);
     if(single_point[2]<tmp+0.05 && single_point[2]>tmp-0.05){
       tmp_point += single_point; 
+      data_pts.at<double>(counter, 0) = single_point[0];
+      data_pts.at<double>(counter, 1) = single_point[1];
+      data_pts.at<double>(counter, 2) = single_point[2];
       counter += 1;
     }
   }}
@@ -602,8 +608,28 @@ cv::Vec3f pointCloudTrajectory(cv::Mat cloud){
   pc_traj[1] = tmp_point[1];
   pc_traj[2] = tmp_point[2];
 
-  return pc_traj;
 
+  data_pts.resize(counter);
+  //Perform PCA analysis
+  cv::PCA pca_analysis(data_pts, cv::Mat(), CV_PCA_DATA_AS_ROW);
+  //Store the center of the object
+  cv::Point3d cntr = cv::Point3d(static_cast<int>(pca_analysis.mean.at<double>(0, 0)),
+                                 static_cast<int>(pca_analysis.mean.at<double>(0, 1)),
+                                 static_cast<int>(pca_analysis.mean.at<double>(0, 2)));
+  //Store the eigenvalues and eigenvectors
+  std::vector<cv::Point3d> eigen_vecs(3);
+  std::vector<double> eigen_val(3);
+  for (int i = 0; i < 3; ++i)
+  {
+      eigen_vecs[i] = cv::Point3d(pca_analysis.eigenvectors.at<double>(i, 0),
+                                  pca_analysis.eigenvectors.at<double>(i, 1),
+                                  pca_analysis.eigenvectors.at<double>(i, 2));
+      eigen_val[i] = pca_analysis.eigenvalues.at<double>(0, i);
+  }
+  printf("EVs: %.4f %.4f %.4f    ",eigen_val[0]*1000,eigen_val[1]*1000,eigen_val[2]*1000);
+
+  EV = eigen_val;
+  point = pc_traj;
 }
 
 
@@ -824,15 +850,23 @@ cv::Vec3f movingAveragePoint(std::vector<cv::Vec3f> points,float window){
 
 //====================================================================================================================================
 
-float movingAverageSpeed(std::vector<float> speeds,float window){
+float movingAverageFloat(std::vector<float> data,float window){
   float average = 0.0;
-  for (int i=0;i<speeds.size();i++)
-    average += speeds[i];  
+  for (int i=0;i<data.size();i++)
+    average += data[i];  
   average = average / window;
   return average;
 }
 
+//====================================================================================================================================
 
+double movingAverageDouble(std::vector<double> data,float window){
+  double average = 0.0;
+  for (int i=0;i<data.size();i++)
+    average += data[i];  
+  average = average / window;
+  return average;
+}
 
 
 

@@ -8,3 +8,8 @@
  - contact detection based on depth.
  - aruco marker tracker is added from the open source project.
 
+[02] PCA, SINUOSITY
+- 24/11/2016
+- included PCA and SINUOSITY analysis for tilting and curve identification.
+- started to include some data recorded.
+- repetitive motion of cutting/hitting is not clearly visible. +++++

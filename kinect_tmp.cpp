@@ -54,6 +54,8 @@ cv::Vec3f single_point_obj_global;
 
 cv::Vec3f faces_global;
 
+std::vector<double> eig_val_global(3);
+
 // threads
 int MAX = 4;
 sem_t mutex_t1,mutex_t5,mutex_t6;
@@ -68,8 +70,8 @@ bool flag_marker = false; int marker_num = 2;
 //#define FLAG_DEPTH
 //#define FLAG_MARKER
 //#define FLAG_PLANE
-//#define FLAG_OBJECT
-//#define FLAG_HAND
+#define FLAG_OBJECT
+#define FLAG_HAND
 //#define FLAG_FACE
 #define FLAG_THREAD
 #define FLAG_WRITE
@@ -202,8 +204,8 @@ void* objectDetector(void* arg)
 //  sat_range_obj[0] = 133; sat_range_obj[1] = 255;
 
 //red bar
-//  hue_range_obj[0] = 116; hue_range_obj[1] = 138;
-//  sat_range_obj[0] = 199; sat_range_obj[1] = 255;
+  hue_range_obj[0] = 116; hue_range_obj[1] = 138;
+  sat_range_obj[0] = 199; sat_range_obj[1] = 255;
 
 // blue board
 //  hue_range_obj[0] = 0; hue_range_obj[1] = 81;
@@ -214,8 +216,8 @@ void* objectDetector(void* arg)
 //  sat_range_obj[0] = 31; sat_range_obj[1] = 77;
 
 // green cup
-  hue_range_obj[0] = 77; hue_range_obj[1] = 98;
-  sat_range_obj[0] = 76; sat_range_obj[1] = 214;
+//  hue_range_obj[0] = 77; hue_range_obj[1] = 98;
+//  sat_range_obj[0] = 76; sat_range_obj[1] = 214;
 
 // yellow plyers
 //  hue_range_obj[0] = 80; hue_range_obj[1] = 102;
@@ -395,7 +397,7 @@ void* contactDetector(void* arg)
       cloud_global.copyTo(cloud_mask,mask_obj_global); //taking the obj only
       cloud_mask(object_blob_global).copyTo(cloud_mask2); // reducing the search area
       //cloud_global(object_blob_global).copyTo(cloud_mask);
-      single_point_obj_global = pointCloudTrajectory(cloud_mask2);
+      pointCloudTrajectory(cloud_mask2,single_point_obj_global,eig_val_global);
       cloud_mask.release();
       cloud_mask2.release();
       //*********************************************************[OBJECT POINT]
@@ -463,13 +465,22 @@ void* writeData(void* arg)
   std::ofstream write_file;
   cv::Mat cloud_mask,cloud_mask2;
 
-  float window = 3.0;
-  std::vector<cv::Vec3f> points(window);
-  std::vector<cv::Vec3f> velocities(window);
-  std::vector<float> speeds(window);
+  float window1 = 5.0;
+  float window2 = 3.0;
+  std::vector<cv::Vec3f> points(window1);
+  std::vector<cv::Vec3f> points_sinuosity(7);
+  std::vector<cv::Vec3f> velocities(window2);
+  std::vector<float> speeds(window2);
+  std::vector<double> eig_vals1(window1);
+  std::vector<double> eig_vals2(window1);
   cv::Vec3f p1(0,0,0), p2(0,0,0);
   cv::Vec3f vel1(0,0,0), vel2(0,0,0);
   float spd1 = 0.0, spd2 = 0.0;
+  float sinuosity1 = 0.0;
+  float sinuosity2 = 0.0;
+  float sinuosity3 = 0.0;
+  double EV1, EV2;
+  bool tilt = false;
 
   int loc_known, loc_pred;
   int loc_num = 3;
@@ -492,7 +503,7 @@ void* writeData(void* arg)
   action_name[2] = "DRINKING";
   action_name[3] = "DISPOSE "; 
   action_name[4] = "FILLING "; 
-  action_name[5] = "AAAAAAA "; 
+  action_name[5] = "TILTING "; 
 
   sleep(1);
 
@@ -501,21 +512,39 @@ void* writeData(void* arg)
     sem_wait(&lock_t6);
     sem_wait(&mutex_t6);
     
-    for(int i=0;i<window-1;i++) points[i] = points[i+1];
-    points[window-1] = single_point_obj_global;
+    for(int i=0;i<window1-1;i++) points[i] = points[i+1];
+    points[window1-1] = single_point_obj_global;
     p1 = p2; // last point
-    p2 = movingAveragePoint(points,window);
+    p2 = movingAveragePoint(points,window1);
 
-    for(int i=0;i<window-1;i++) velocities[i] = velocities[i+1];
-    velocities[window-1] = pointToVelocity(p1,p2);
+    for(int i=0;i<window2-1;i++) velocities[i] = velocities[i+1];
+    velocities[window2-1] = pointToVelocity(p1,p2);
     vel1 = vel2; // last point
-    vel2 = movingAveragePoint(velocities,window);
+    vel2 = movingAveragePoint(velocities,window2);
 
-    for(int i=0;i<window-1;i++) speeds[i] = speeds[i+1];
-    speeds[window-1] = pointToSpeed(p1,p2);
+    for(int i=0;i<window2-1;i++) speeds[i] = speeds[i+1];
+    speeds[window2-1] = pointToSpeed(p1,p2);
     spd1 = spd2;
-    spd2 = movingAverageSpeed(speeds,window);
+    spd2 = movingAverageFloat(speeds,window2);
 
+    for(int i=0;i<window1-1;i++) eig_vals1[i] = eig_vals1[i+1];
+    eig_vals1[window1-1] = eig_val_global[0];
+    EV1 = movingAverageDouble(eig_vals1,window1);
+    for(int i=0;i<window1-1;i++) eig_vals2[i] = eig_vals2[i+1];
+    eig_vals2[window1-1] = eig_val_global[1];
+    EV2 = movingAverageDouble(eig_vals2,window1);
+
+    for(int i=0;i<7-1;i++) points_sinuosity[i] = points_sinuosity[i+1];
+    points_sinuosity[7-1] = p2;
+    sinuosity1 = (norm(points_sinuosity[4]-points_sinuosity[5])  + 
+                  norm(points_sinuosity[5]-points_sinuosity[6])) / 
+                 (norm(points_sinuosity[4]-points_sinuosity[6]));
+    sinuosity2 = (norm(points_sinuosity[2]-points_sinuosity[4])  + 
+                  norm(points_sinuosity[4]-points_sinuosity[6])) / 
+                 (norm(points_sinuosity[2]-points_sinuosity[6]));
+    sinuosity3 = (norm(points_sinuosity[0]-points_sinuosity[3])  + 
+                  norm(points_sinuosity[3]-points_sinuosity[6])) / 
+                 (norm(points_sinuosity[0]-points_sinuosity[6]));
 
     locations[0] = faces_global;
     locations[1] = marker_center_global[0];
@@ -537,6 +566,14 @@ void* writeData(void* arg)
     // moving
     if(spd2 > 0.003){ // 0.003 is hard coded, need more evaluation ####
       action = 1;
+
+      //[TILTING PREDICTION]
+      //if(EV1 > 0.00061 && EV2 < 0.00033) tilt = true;
+//      if(EV1/EV2 > 1.7) tilt = true;
+//      else tilt = false;
+//      if(tilt) action = 5;
+
+      //[LOCATION PREDICTION]
       for(int i=0;i<loc_num;i++){
         pred_p_loc[i] = (0.5 * angle_p_loc[i]) + (0.5 * dist_p_loc[i]);
         if (pred_p_loc[i] > pred_p_loc_tmp){
@@ -550,6 +587,13 @@ void* writeData(void* arg)
     // stationary
     else{ 
       action = 0;
+    
+      //[TILTING PREDICTION]
+//      if(EV1/EV2 > 1.7) tilt = true;
+//      else tilt = false;
+//      if(tilt) action = 5;
+
+      //[LOCATION PREDICTION]
       for(int i=0;i<loc_num;i++){  
         pred_p_loc[i] = (0.0 * angle_p_loc[i]) + (1.0 * dist_p_loc[i]);
         if (pred_p_loc[i] > pred_p_loc_tmp){
@@ -562,6 +606,8 @@ void* writeData(void* arg)
     }
 
 
+eig_val_global[0];
+eig_val_global[1];
 
 
 
@@ -602,7 +648,13 @@ void* writeData(void* arg)
                << pred_p_loc[0] << ","
                << pred_p_loc[1] << ","
                << pred_p_loc[2] << ","
-               << spd2
+               << spd2 << ","
+               << sinuosity1 << ","
+               << sinuosity2 << ","
+               << sinuosity3 << ","
+               << eig_val_global[0] << ","
+               << eig_val_global[1] << ","
+               << eig_val_global[2] 
                << "\n";
     }
 #endif
