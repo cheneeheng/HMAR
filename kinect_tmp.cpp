@@ -235,6 +235,14 @@ void* objectDetector(void* arg)
 //  hue_range_obj[0] = 0; hue_range_obj[1] = 54;
 //  sat_range_obj[0] = 140; sat_range_obj[1] = 184;
 
+// orange
+//  hue_range_obj[0] = 100; hue_range_obj[1] = 107;
+//  sat_range_obj[0] = 163; sat_range_obj[1] = 255;
+
+// yellow sponge
+//  hue_range_obj[0] = 95; hue_range_obj[1] = 106;
+//  sat_range_obj[0] = 110; sat_range_obj[1] = 186;
+
   cv::Mat img_rgb(480,640,CV_8UC3);
   cv::Mat seg_mask(480,640,CV_8UC1);
   cv::Rect box_obj;
@@ -468,9 +476,11 @@ void* writeData(void* arg)
   float window1 = 5.0;
   float window2 = 3.0;
   std::vector<cv::Vec3f> points(window1);
+  std::vector<cv::Vec3f> pca_points(7);
   std::vector<cv::Vec3f> points_sinuosity(7);
   std::vector<cv::Vec3f> velocities(window2);
   std::vector<float> speeds(window2);
+  std::vector<float> slides(window1);
   std::vector<double> eig_vals1(window1);
   std::vector<double> eig_vals2(window1);
   cv::Vec3f p1(0,0,0), p2(0,0,0);
@@ -481,6 +491,14 @@ void* writeData(void* arg)
   float sinuosity3 = 0.0;
   double EV1, EV2;
   bool tilt = false;
+
+  float slide = 0.0;
+
+  cv::Vec3f surface(0,0,0);
+
+  int pca_window = 9;
+  cv::Mat pca_data_pts = cv::Mat(pca_window, 3, CV_64FC1);
+  double constraints = 0.0;
 
   int loc_known, loc_pred;
   int loc_num = 3;
@@ -497,13 +515,17 @@ void* writeData(void* arg)
   locations_limit[2] = 0.15;
 
   int action = 0;
-  std::vector<std::string> action_name(6);
+  std::vector<std::string> action_name(10);
   action_name[0] = "NULL    ";
   action_name[1] = "MOVING  ";
   action_name[2] = "DRINKING";
   action_name[3] = "DISPOSE "; 
   action_name[4] = "FILLING "; 
   action_name[5] = "TILTING "; 
+  action_name[6] = "SLIDING "; 
+  action_name[7] = " "; 
+  action_name[8] = " "; 
+  action_name[9] = " "; 
 
   sleep(1);
 
@@ -562,10 +584,59 @@ void* writeData(void* arg)
       dist_p_loc[i] = exp(-5*(norm(locations[i]-p2)-locations_limit[i])*(norm(locations[i]-p2)-locations_limit[i]));
     }
 
+
+    surface[0] = plane_global[0];
+    surface[1] = plane_global[1];
+    surface[2] = plane_global[2];
+    slide = norm(crossProd(vel2,surface))/(norm(vel2)*norm(surface));    
+    for(int i=0;i<window1-1;i++) slides[i] = slides[i+1];
+    slides[window1-1] = slide;
+    slide = movingAverageFloat(slides,window1);
+    if(p2[0]*surface[0] + 
+       p2[1]*surface[1] + 
+       p2[2]*surface[2] - plane_global[3] > 0.1)
+      slide = 0.0;
+
+
+
+
+
+    for(int i=0;i<pca_window-1;i++) pca_points[i] = pca_points[i+1];
+    pca_points[pca_window-1] = p2;
+
+    for(int i=0;i<pca_window-1;i++){
+      pca_points[i] = pca_points[i+1];
+      pca_data_pts.at<double>(i, 0) = pca_points[i][0];
+      pca_data_pts.at<double>(i, 1) = pca_points[i][1];
+      pca_data_pts.at<double>(i, 2) = pca_points[i][2];
+    }
+    pca_points[pca_window-1] = p2;
+    pca_data_pts.at<double>(pca_window-1, 0) = pca_points[pca_window-1][0];
+    pca_data_pts.at<double>(pca_window-1, 1) = pca_points[pca_window-1][1];
+    pca_data_pts.at<double>(pca_window-1, 2) = pca_points[pca_window-1][2];
+    //Perform PCA analysis
+    cv::PCA pca_analysis(pca_data_pts, cv::Mat(), CV_PCA_DATA_AS_ROW);
+    //Store the eigenvalues and eigenvectors
+    std::vector<cv::Point3d> eigen_vecs(3);
+    std::vector<double> eigen_val(3);
+    for (int i=0;i<3;++i){
+      eigen_vecs[i] = cv::Point3d(pca_analysis.eigenvectors.at<double>(i, 0),
+                                  pca_analysis.eigenvectors.at<double>(i, 1),
+                                  pca_analysis.eigenvectors.at<double>(i, 2));
+      eigen_val[i] = pca_analysis.eigenvalues.at<double>(0, i);
+    }
+    if(eigen_val[0]>0 && eigen_val[0]>0)
+      constraints = (eigen_val[0] / eigen_val[2]);
+
+
+//=========================================================================================================================================
     pred_p_loc_tmp = 0.0;
     // moving
     if(spd2 > 0.003){ // 0.003 is hard coded, need more evaluation ####
       action = 1;
+      
+      //[SLIDING PREDICTION]
+      if(slide > 0.9) action = 6;
 
       //[TILTING PREDICTION]
       //if(EV1 > 0.00061 && EV2 < 0.00033) tilt = true;
@@ -604,14 +675,6 @@ void* writeData(void* arg)
           action = 2 + i;
       }
     }
-
-
-eig_val_global[0];
-eig_val_global[1];
-
-
-
-
 
 
 

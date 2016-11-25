@@ -13,3 +13,8 @@
 - included PCA and SINUOSITY analysis for tilting and curve identification.
 - started to include some data recorded.
 - repetitive motion of cutting/hitting is not clearly visible. +++++
+
+[03] PCA on points, slidding
+- 25/11/2016
+- repetitive motion of cutting/hitting is not clearly visible. +++++
+- sliding based on surface normal vector

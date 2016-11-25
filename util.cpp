@@ -612,10 +612,6 @@ void pointCloudTrajectory(cv::Mat cloud, cv::Vec3f &point, std::vector<double> &
   data_pts.resize(counter);
   //Perform PCA analysis
   cv::PCA pca_analysis(data_pts, cv::Mat(), CV_PCA_DATA_AS_ROW);
-  //Store the center of the object
-  cv::Point3d cntr = cv::Point3d(static_cast<int>(pca_analysis.mean.at<double>(0, 0)),
-                                 static_cast<int>(pca_analysis.mean.at<double>(0, 1)),
-                                 static_cast<int>(pca_analysis.mean.at<double>(0, 2)));
   //Store the eigenvalues and eigenvectors
   std::vector<cv::Point3d> eigen_vecs(3);
   std::vector<double> eigen_val(3);
@@ -626,7 +622,7 @@ void pointCloudTrajectory(cv::Mat cloud, cv::Vec3f &point, std::vector<double> &
                                   pca_analysis.eigenvectors.at<double>(i, 2));
       eigen_val[i] = pca_analysis.eigenvalues.at<double>(0, i);
   }
-  printf("EVs: %.4f %.4f %.4f    ",eigen_val[0]*1000,eigen_val[1]*1000,eigen_val[2]*1000);
+  //printf("EVs: %.4f %.4f %.4f    ",eigen_val[0]*1000,eigen_val[1]*1000,eigen_val[2]*1000);
 
   EV = eigen_val;
   point = pc_traj;
